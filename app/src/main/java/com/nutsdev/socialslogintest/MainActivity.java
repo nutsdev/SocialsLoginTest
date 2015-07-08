@@ -1,5 +1,6 @@
 package com.nutsdev.socialslogintest;
 
+import android.content.IntentSender;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -12,6 +13,8 @@ import com.google.android.gms.plus.Plus;
 
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final int REQUEST_CODE_RESOLVE_ERR = 9000;
 
     private GoogleApiClient googleApiClient;
 
@@ -80,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
         public void onConnected(Bundle bundle) {
             // Update the user interface to reflect that the user is signed in.
             sign_in_button.setEnabled(false);
+            Toast.makeText(getApplicationContext(), "Connected!", Toast.LENGTH_SHORT).show();
         }
 
         @Override
@@ -92,9 +96,21 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private GoogleApiClient.OnConnectionFailedListener googlePlusOnConnectionFailedListener = new GoogleApiClient.OnConnectionFailedListener() {
+        /* onConnectionFailed is called when our Activity could not connect to Google
+         * Play services.  onConnectionFailed indicates that the user needs to select
+         * an account, grant permissions or resolve an error in order to sign in.
+         */
         @Override
         public void onConnectionFailed(ConnectionResult connectionResult) {
-
+            Toast.makeText(getApplicationContext(), "Connection failed! " + connectionResult.getErrorCode(), Toast.LENGTH_SHORT).show();
+            if (connectionResult.hasResolution()) {
+                try {
+                    // !!!
+                    connectionResult.startResolutionForResult(MainActivity.this, REQUEST_CODE_RESOLVE_ERR);
+                } catch (IntentSender.SendIntentException e) {
+                    googleApiClient.connect();
+                }
+            }
         }
     };
 
