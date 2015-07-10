@@ -2,18 +2,34 @@ package com.nutsdev.socialslogintest;
 
 import android.content.Intent;
 import android.content.IntentSender;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.facebook.AccessToken;
+import com.facebook.AccessTokenTracker;
+import com.facebook.CallbackManager;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
+import com.facebook.GraphRequest;
+import com.facebook.GraphResponse;
+import com.facebook.Profile;
+import com.facebook.ProfileTracker;
+import com.facebook.login.LoginResult;
+import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.plus.Plus;
 import com.google.android.gms.plus.model.people.Person;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -26,7 +42,12 @@ public class MainActivity extends AppCompatActivity {
 
     private GoogleApiClient googleApiClient;
 
+    private CallbackManager callbackManager;
+    private AccessTokenTracker facebookTokenTracker;
+    private ProfileTracker facebookProfileTracker;
+
     private SignInButton sign_in_button;
+    private LoginButton login_button;
     private Button logOut_button;
 
     /* A flag indicating that a PendingIntent is in progress and prevents us from starting further intents. */
@@ -39,15 +60,29 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        FacebookSdk.sdkInitialize(getApplicationContext());
+
         setContentView(R.layout.activity_main);
 
         googleApiClient = buildGoogleApiClient();
-        FacebookSdk.sdkInitialize(getApplicationContext());
 
         sign_in_button = (SignInButton) findViewById(R.id.sign_in_button);
         sign_in_button.setOnClickListener(googleButtonListener);
+        login_button = (LoginButton) findViewById(R.id.login_button);
+        setupFacebook();
         logOut_button = (Button) findViewById(R.id.logOut_button);
         logOut_button.setOnClickListener(logOutButtonListener);
+    }
+
+    private void setupFacebook() {
+        setupTokenTracker();
+        setupProfileTracker();
+        facebookTokenTracker.startTracking();
+        facebookProfileTracker.startTracking();
+
+        callbackManager = CallbackManager.Factory.create();
+        login_button.setReadPermissions("public_profile", "email");
+        login_button.registerCallback(callbackManager, loginResultFacebookCallback);
     }
 
     @Override
@@ -72,6 +107,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    //    facebookTokenTracker.stopTracking();
+    //    facebookProfileTracker.stopTracking();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     //    super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_CODE_SIGN_IN) {
@@ -80,6 +122,8 @@ public class MainActivity extends AppCompatActivity {
             if (!googleApiClient.isConnecting()) {
                 googleApiClient.connect();
             }
+        } else {
+            callbackManager.onActivityResult(requestCode, resultCode, data);
         }
     }
 
@@ -95,6 +139,24 @@ public class MainActivity extends AppCompatActivity {
         return builder.build();
     }
 
+    private void setupTokenTracker() {
+        facebookTokenTracker = new AccessTokenTracker() {
+            @Override
+            protected void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken currentAccessToken) {
+                Log.d("TokenTracker", "" + currentAccessToken);
+            }
+        };
+    }
+
+    private void setupProfileTracker() {
+        facebookProfileTracker = new ProfileTracker() {
+            @Override
+            protected void onCurrentProfileChanged(Profile oldProfile, Profile currentProfile) {
+                Log.d("ProfileTracker", "" + currentProfile);
+            }
+        };
+    }
+
 
     /* listeners */
 
@@ -102,8 +164,63 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onClick(View v) {
             Toast.makeText(getApplicationContext(), "CLICKED", Toast.LENGTH_SHORT).show();
-            sign_in_button.setEnabled(false);
+        //    sign_in_button.setEnabled(false);
             googleApiClient.connect();
+        }
+    };
+
+    private FacebookCallback<LoginResult> loginResultFacebookCallback = new FacebookCallback<LoginResult>() {
+        @Override
+        public void onSuccess(LoginResult loginResult) {
+            final UserInfo userInfo = new UserInfo();
+            Profile profile = Profile.getCurrentProfile();
+            if (profile != null) {
+                userInfo.userName = profile.getName();
+                userInfo.userAvatarUrl = profile.getProfilePictureUri(50, 50).toString();
+                userInfo.userProfileUrl = profile.getLinkUri().toString();
+                userInfo.userId = profile.getId();
+            }
+
+            GraphRequest request = GraphRequest.newMeRequest(loginResult.getAccessToken(), new GraphRequest.GraphJSONObjectCallback() {
+                        @Override
+                        public void onCompleted(JSONObject object, GraphResponse response) {
+                            userInfo.userId = object.optString("id");
+                            userInfo.userEmail = object.optString("email");
+                            userInfo.userName = object.optString("name");
+                            JSONObject jsonData;
+                            String userAvatarUrl = null;
+                            try {
+                                jsonData = object.getJSONObject("picture").getJSONObject("data");
+                                userAvatarUrl = jsonData.getString("url");
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                                Toast.makeText(MainActivity.this, "Error parsing JSON!", Toast.LENGTH_SHORT).show();
+                            }
+                            userInfo.userAvatarUrl = userAvatarUrl;
+                        //    userInfo.userAvatarUrl = String.format("http://graph.facebook.com/%s/picture?type=large", userInfo.userId); // high res avatar picture
+                            userInfo.userProfileUrl = object.optString("link");
+                            Log.d("onCompleted", userInfo.userEmail + " " + userInfo.userName + " " + userInfo.userAvatarUrl + " " + userInfo.userProfileUrl + " " + userInfo.userId);
+
+                            Intent intent = new Intent(MainActivity.this, WelcomeActivity.class);
+                            intent.putExtra(USER_INFO, userInfo);
+                            startActivity(intent);
+                        }
+                    });
+
+            Bundle parameters = new Bundle();
+            parameters.putString("fields", "id, name, email, link, picture");
+            request.setParameters(parameters);
+            request.executeAsync();
+        }
+
+        @Override
+        public void onCancel() {
+            Toast.makeText(MainActivity.this, "onCancel", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onError(FacebookException e) {
+            Toast.makeText(MainActivity.this, "onError " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     };
 
@@ -118,6 +235,9 @@ public class MainActivity extends AppCompatActivity {
 
             sign_in_button.setEnabled(true);
             logOut_button.setEnabled(googleApiClient.isConnected());
+
+            // todo
+            // LoginManager.getInstance().logOut();
         }
     };
 
@@ -171,5 +291,17 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+
+    /* inner classes */
+
+    public class GetFacebookAvatarUrl extends AsyncTask<String, Void, String> {
+        // class for loading high res avatar image from facebook using graph API
+        @Override
+        protected String doInBackground(String... params) {
+            return null;
+        }
+
+    }
 
 }
