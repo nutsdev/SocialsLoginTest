@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.facebook.FacebookSdk;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -41,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         googleApiClient = buildGoogleApiClient();
+        FacebookSdk.sdkInitialize(getApplicationContext());
 
         sign_in_button = (SignInButton) findViewById(R.id.sign_in_button);
         sign_in_button.setOnClickListener(googleButtonListener);
