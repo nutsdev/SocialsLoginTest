@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String USER_INFO = "USER_INFO";
 
     /* Request code used to invoke sign in user interactions. */
-    private static final int REQUEST_CODE_SIGN_IN = 0;
+    private static final int REQUEST_CODE_SIGN_IN = 555;
     private static final int REQUEST_CODE_RESOLVE_ERR = 9000;
 
     private GoogleApiClient googleApiClient;
@@ -164,6 +164,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onClick(View v) {
             Toast.makeText(getApplicationContext(), "CLICKED", Toast.LENGTH_SHORT).show();
+            if (googleApiClient != null && googleApiClient.isConnected()) { // todo remove?
+                Plus.AccountApi.clearDefaultAccount(googleApiClient);
+                googleApiClient.disconnect();
+            }
         //    sign_in_button.setEnabled(false);
             googleApiClient.connect();
         }
@@ -174,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
         public void onSuccess(LoginResult loginResult) {
             final UserInfo userInfo = new UserInfo();
             Profile profile = Profile.getCurrentProfile();
-            if (profile != null) {
+            if (profile != null) { // todo move to profileTracker?
                 userInfo.userName = profile.getName();
                 userInfo.userAvatarUrl = profile.getProfilePictureUri(50, 50).toString();
                 userInfo.userProfileUrl = profile.getLinkUri().toString();
