@@ -6,7 +6,6 @@ import android.app.PendingIntent;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -43,6 +42,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements GooglePlusService.GooglePlusCallback {
 
     public static final String USER_INFO = "USER_INFO";
+
     private static final int NOT_SIGNED_IN = -1;
     private static final int SIGNED_WITH_GOOGLE = 1;
     private static final int SIGNED_WITH_FACEBOOK = 2;
@@ -215,8 +215,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
 
     private Dialog createErrorDialog() {
         if (GooglePlayServicesUtil.isUserRecoverableError(signInError)) {
-            return GooglePlayServicesUtil.getErrorDialog(signInError, this, REQUEST_CODE_SIGN_IN,
-                    new DialogInterface.OnCancelListener() {
+            return GooglePlayServicesUtil.getErrorDialog(signInError, this, REQUEST_CODE_SIGN_IN, new DialogInterface.OnCancelListener() {
                         @Override
                         public void onCancel(DialogInterface dialog) {
                             L.e("Google Play services resolution cancelled");
@@ -227,8 +226,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
         } else {
             return new AlertDialog.Builder(this)
                     .setMessage("Google Play services is not available. This application will close.")
-                    .setPositiveButton("Close",
-                            new DialogInterface.OnClickListener() {
+                    .setPositiveButton("Close", new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     L.e("Google Play services error could not be resolved: " + signInError);
@@ -237,6 +235,24 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
                                 }
                             }).create();
         }
+    }
+
+    private void changeButtonsState(int loggedWith) {
+        if (loggedWith == NOT_SIGNED_IN) {
+            sign_in_button.setEnabled(true);
+            login_button.setEnabled(true);
+            logOut_button.setEnabled(false);
+            signedWith = NOT_SIGNED_IN;
+            return;
+        } else if (loggedWith == SIGNED_WITH_GOOGLE) {
+            signedWith = SIGNED_WITH_GOOGLE;
+        } else if (loggedWith == SIGNED_WITH_FACEBOOK) {
+            signedWith = SIGNED_WITH_FACEBOOK;
+        }
+
+        sign_in_button.setEnabled(false);
+        login_button.setEnabled(false);
+        logOut_button.setEnabled(true);
     }
 
     private void setupTokenTracker() {
@@ -285,10 +301,9 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
      * device, that the selected account has granted any requested permissions to our app and that we were able to establish a service connection to Google Play services. */
     @Override
     public void onConnected(Bundle connectionHint) {
-        signedWith = SIGNED_WITH_GOOGLE;
-        // Update the user interface to reflect that the user is signed in.
         L.t(this, "Connected!");
-        sign_in_button.setEnabled(false);
+        // Update the user interface to reflect that the user is signed in.
+        changeButtonsState(SIGNED_WITH_GOOGLE);
 
         UserInfo userInfo = new UserInfo();
         // Retrieve some profile information to personalize our app for the user.
@@ -332,8 +347,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
     private FacebookCallback<LoginResult> loginResultFacebookCallback = new FacebookCallback<LoginResult>() {
         @Override
         public void onSuccess(LoginResult loginResult) {
-            signedWith = SIGNED_WITH_FACEBOOK;
-            login_button.setEnabled(false);
+            changeButtonsState(SIGNED_WITH_FACEBOOK);
 
             final UserInfo userInfo = new UserInfo();
             Profile profile = Profile.getCurrentProfile();
@@ -400,30 +414,14 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
                         Plus.AccountApi.clearDefaultAccount(googlePlusService.getGoogleApiClient());
                         googlePlusService.disconnect();
                     }
-
-                    sign_in_button.setEnabled(true);
-                    logOut_button.setEnabled(googlePlusService.isConnected());
                     break;
                 case SIGNED_WITH_FACEBOOK:
                     loginManager.logOut();
-                    login_button.setEnabled(true);
-                    logOut_button.setEnabled(Profile.getCurrentProfile() == null);
                     break;
             }
-            signedWith = NOT_SIGNED_IN;
+            changeButtonsState(NOT_SIGNED_IN);
         }
     };
 
-
-    /* inner classes */
-
-    public class GetFacebookAvatarUrl extends AsyncTask<String, Void, String> {
-        // class for loading high res avatar image from facebook using graph API
-        @Override
-        protected String doInBackground(String... params) {
-            return null;
-        }
-
-    }
 
 }
