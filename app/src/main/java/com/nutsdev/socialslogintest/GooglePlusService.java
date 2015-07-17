@@ -41,11 +41,31 @@ public class GooglePlusService implements GoogleApiClient.ConnectionCallbacks, G
     private GooglePlusService(Context context) {
         this.context = context;
         callbacks = new ArrayList<>();
-        buildGoogleApiClient();
+        googleApiClient = buildGoogleApiClient();
     }
 
 
     /* public methods */
+
+    public GoogleApiClient getGoogleApiClient() {
+        return googleApiClient;
+    }
+
+    public void connect() {
+        googleApiClient.connect();
+    }
+
+    public void disconnect() {
+        googleApiClient.disconnect();
+    }
+
+    public boolean isConnecting() {
+        return googleApiClient.isConnecting();
+    }
+
+    public boolean isConnected() {
+        return googleApiClient.isConnected();
+    }
 
     public void register(GooglePlusCallback callback) {
         callbacks.add(callback);
