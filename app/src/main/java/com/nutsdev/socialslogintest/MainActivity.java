@@ -63,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
     private boolean intentInProgress;
 
 
-
     /* lifecycle */
 
     @Override
