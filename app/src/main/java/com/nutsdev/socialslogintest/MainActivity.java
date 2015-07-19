@@ -14,16 +14,10 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import com.facebook.AccessToken;
-import com.facebook.AccessTokenTracker;
-import com.facebook.CallbackManager;
-import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
-import com.facebook.FacebookSdk;
 import com.facebook.GraphRequest;
 import com.facebook.GraphResponse;
 import com.facebook.Profile;
-import com.facebook.ProfileTracker;
-import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -39,7 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 
 
-public class MainActivity extends AppCompatActivity implements GooglePlusLoginManager.GooglePlusCallback {
+public class MainActivity extends AppCompatActivity implements GooglePlusLoginManager.GooglePlusCallback, FacebookLoginManager.FacebookCallback {
 
     public static final String USER_INFO = "USER_INFO";
 
@@ -82,15 +76,11 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     private int signInError;
 
     private GooglePlusLoginManager googlePlusLoginManager;
-
-    private LoginManager loginManager;
-    private CallbackManager callbackManager;
-    private AccessTokenTracker facebookTokenTracker;
-    private ProfileTracker facebookProfileTracker;
+    private FacebookLoginManager facebookLoginManager;
 
     private SignInButton google_login_button; // Google login button
     private Button facebook_login_button; // Facebook login button
-    private Button logOut_button;
+    private Button logout_button;
 
 
     /* lifecycle */
@@ -98,50 +88,37 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FacebookSdk.sdkInitialize(getApplicationContext());
+        facebookLoginManager = FacebookLoginManager.getInstance(getApplicationContext());
+        googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
 
         setContentView(R.layout.activity_main);
-
-        googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
 
         google_login_button = (SignInButton) findViewById(R.id.google_login_button);
         google_login_button.setOnClickListener(googleButtonListener);
         facebook_login_button = (Button) findViewById(R.id.facebook_login_button);
-        setupFacebook();
-        logOut_button = (Button) findViewById(R.id.logOut_button);
-        logOut_button.setOnClickListener(logOutButtonListener);
-    }
-
-    private void setupFacebook() {
-        setupTokenTracker();
-        setupProfileTracker();
-        facebookTokenTracker.startTracking();
-        facebookProfileTracker.startTracking();
-
-        callbackManager = CallbackManager.Factory.create();
-        loginManager = LoginManager.getInstance();
-        loginManager.registerCallback(callbackManager, loginResultFacebookCallback);
         facebook_login_button.setOnClickListener(facebookLoginButtonListener);
-    //    facebook_login_button.setReadPermissions("public_profile", "email");
-    //    facebook_login_button.registerCallback(callbackManager, loginResultFacebookCallback);
+        logout_button = (Button) findViewById(R.id.logout_button);
+        logout_button.setOnClickListener(logOutButtonListener);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        logOut_button.setEnabled(signedWith > 0);
+        logout_button.setEnabled(signedWith > 0);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         googlePlusLoginManager.registerCallback(this);
+        facebookLoginManager.registerCallback(this);
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         googlePlusLoginManager.unregisterCallback(this);
+        facebookLoginManager.unregisterCallback(this);
     }
 
     @Override
@@ -171,7 +148,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
                 googlePlusLoginManager.connect();
             }
         } else {
-            callbackManager.onActivityResult(requestCode, resultCode, data);
+            facebookLoginManager.onActivityResult(requestCode, resultCode, data);
         }
     }
 
@@ -241,7 +218,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         if (loggedWith == NOT_SIGNED_IN) {
             google_login_button.setEnabled(true);
             facebook_login_button.setEnabled(true);
-            logOut_button.setEnabled(false);
+            logout_button.setEnabled(false);
             signedWith = NOT_SIGNED_IN;
             return;
         } else if (loggedWith == SIGNED_WITH_GOOGLE) {
@@ -252,25 +229,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
 
         google_login_button.setEnabled(false);
         facebook_login_button.setEnabled(false);
-        logOut_button.setEnabled(true);
-    }
-
-    private void setupTokenTracker() {
-        facebookTokenTracker = new AccessTokenTracker() {
-            @Override
-            protected void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken currentAccessToken) {
-                Log.d("TokenTracker", "" + currentAccessToken);
-            }
-        };
-    }
-
-    private void setupProfileTracker() {
-        facebookProfileTracker = new ProfileTracker() {
-            @Override
-            protected void onCurrentProfileChanged(Profile oldProfile, Profile currentProfile) {
-                Log.d("ProfileTracker", "" + currentProfile);
-            }
-        };
+        logout_button.setEnabled(true);
     }
 
 
@@ -293,7 +252,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         @Override
         public void onClick(View v) {
             List<String> permissions = Arrays.asList("public_profile", "email");
-            loginManager.logInWithReadPermissions(MainActivity.this, permissions);
+            facebookLoginManager.logInWithReadPermissions(MainActivity.this, permissions);
         }
     };
 
@@ -344,62 +303,70 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         }
     }
 
-    private FacebookCallback<LoginResult> loginResultFacebookCallback = new FacebookCallback<LoginResult>() {
-        @Override
-        public void onSuccess(LoginResult loginResult) {
-            changeButtonsState(SIGNED_WITH_FACEBOOK);
+    @Override
+    public void onSuccess(LoginResult loginResult) {
+        changeButtonsState(SIGNED_WITH_FACEBOOK);
 
-            final UserInfo userInfo = new UserInfo();
-            Profile profile = Profile.getCurrentProfile();
-            if (profile != null) { // todo move to profileTracker?
-                userInfo.userName = profile.getName();
-                userInfo.userAvatarUrl = profile.getProfilePictureUri(50, 50).toString();
-                userInfo.userProfileUrl = profile.getLinkUri().toString();
-                userInfo.userId = profile.getId();
+        final UserInfo userInfo = new UserInfo();
+        Profile profile = Profile.getCurrentProfile();
+        if (profile != null) { // todo move to profileTracker?
+            userInfo.userName = profile.getName();
+            userInfo.userAvatarUrl = profile.getProfilePictureUri(50, 50).toString();
+            userInfo.userProfileUrl = profile.getLinkUri().toString();
+            userInfo.userId = profile.getId();
+        }
+
+        GraphRequest request = GraphRequest.newMeRequest(loginResult.getAccessToken(), new GraphRequest.GraphJSONObjectCallback() {
+            @Override
+            public void onCompleted(JSONObject object, GraphResponse response) {
+                userInfo.userId = object.optString("id");
+                userInfo.userEmail = object.optString("email");
+                userInfo.userName = object.optString("name");
+                JSONObject jsonData;
+                String userAvatarUrl = null;
+                try {
+                    jsonData = object.getJSONObject("picture").getJSONObject("data");
+                    userAvatarUrl = jsonData.getString("url");
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    Toast.makeText(MainActivity.this, "Error parsing JSON!", Toast.LENGTH_SHORT).show();
+                }
+                userInfo.userAvatarUrl = userAvatarUrl;
+                //    userInfo.userAvatarUrl = String.format("http://graph.facebook.com/%s/picture?type=large", userInfo.userId); // high res avatar picture
+                userInfo.userProfileUrl = object.optString("link");
+                Log.d("onCompleted", userInfo.userEmail + " " + userInfo.userName + " " + userInfo.userAvatarUrl + " " + userInfo.userProfileUrl + " " + userInfo.userId);
+
+                Intent intent = new Intent(MainActivity.this, WelcomeActivity.class);
+                intent.putExtra(USER_INFO, userInfo);
+                startActivity(intent);
             }
+        });
 
-            GraphRequest request = GraphRequest.newMeRequest(loginResult.getAccessToken(), new GraphRequest.GraphJSONObjectCallback() {
-                        @Override
-                        public void onCompleted(JSONObject object, GraphResponse response) {
-                            userInfo.userId = object.optString("id");
-                            userInfo.userEmail = object.optString("email");
-                            userInfo.userName = object.optString("name");
-                            JSONObject jsonData;
-                            String userAvatarUrl = null;
-                            try {
-                                jsonData = object.getJSONObject("picture").getJSONObject("data");
-                                userAvatarUrl = jsonData.getString("url");
-                            } catch (JSONException e) {
-                                e.printStackTrace();
-                                Toast.makeText(MainActivity.this, "Error parsing JSON!", Toast.LENGTH_SHORT).show();
-                            }
-                            userInfo.userAvatarUrl = userAvatarUrl;
-                        //    userInfo.userAvatarUrl = String.format("http://graph.facebook.com/%s/picture?type=large", userInfo.userId); // high res avatar picture
-                            userInfo.userProfileUrl = object.optString("link");
-                            Log.d("onCompleted", userInfo.userEmail + " " + userInfo.userName + " " + userInfo.userAvatarUrl + " " + userInfo.userProfileUrl + " " + userInfo.userId);
+        Bundle parameters = new Bundle();
+        parameters.putString("fields", "id, name, email, link, picture");
+        request.setParameters(parameters);
+        request.executeAsync();
+    }
 
-                            Intent intent = new Intent(MainActivity.this, WelcomeActivity.class);
-                            intent.putExtra(USER_INFO, userInfo);
-                            startActivity(intent);
-                        }
-                    });
+    @Override
+    public void onCancel() {
+        L.t(this, "onCancel");
+    }
 
-            Bundle parameters = new Bundle();
-            parameters.putString("fields", "id, name, email, link, picture");
-            request.setParameters(parameters);
-            request.executeAsync();
-        }
+    @Override
+    public void onError(FacebookException e) {
+        L.toast(this, "onError " + e.getMessage());
+    }
 
-        @Override
-        public void onCancel() {
-            Toast.makeText(MainActivity.this, "onCancel", Toast.LENGTH_SHORT).show();
-        }
+    @Override
+    public void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken currentAccessToken) {
+        L.toast(this, "old token: " + oldAccessToken + "; new token: " + currentAccessToken);
+    }
 
-        @Override
-        public void onError(FacebookException e) {
-            Toast.makeText(MainActivity.this, "onError " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    };
+    @Override
+    public void onCurrentProfileChanged(Profile oldProfile, Profile currentProfile) {
+        L.toast(this, "old profile: " + oldProfile + "; new profile: " + currentProfile);
+    }
 
     private View.OnClickListener logOutButtonListener = new View.OnClickListener() {
         @Override
@@ -416,12 +383,11 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
                     }
                     break;
                 case SIGNED_WITH_FACEBOOK:
-                    loginManager.logOut();
+                    facebookLoginManager.logOut();
                     break;
             }
             changeButtonsState(NOT_SIGNED_IN);
         }
     };
-
 
 }

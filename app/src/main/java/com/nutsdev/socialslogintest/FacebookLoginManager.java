@@ -12,6 +12,7 @@ import com.facebook.AccessTokenTracker;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
+import com.facebook.FacebookSdk;
 import com.facebook.Profile;
 import com.facebook.ProfileTracker;
 import com.facebook.login.LoginManager;
@@ -36,24 +37,24 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
     private AccessTokenTracker facebookTokenTracker;
     private ProfileTracker facebookProfileTracker;
 
-    private Context appContext;
+    private Context applicationContext;
 
 
-    public static FacebookLoginManager getInstance(Context appContext) {
+    public static FacebookLoginManager getInstance(Context applicationContext) {
         FacebookLoginManager localInstance = instance;
         if (localInstance == null) {
             synchronized (FacebookLoginManager.class) {
                 localInstance = instance;
                 if (localInstance == null) {
-                    instance = localInstance = new FacebookLoginManager(appContext);
+                    instance = localInstance = new FacebookLoginManager(applicationContext);
                 }
             }
         }
         return localInstance;
     }
 
-    private FacebookLoginManager(Context appContext) {
-        this.appContext = appContext;
+    private FacebookLoginManager(Context applicationContext) {
+        this.applicationContext = applicationContext;
         callbacks = new ArrayList<>();
         setupFacebook();
     }
@@ -90,6 +91,9 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
 
     @Override
     public void onSuccess(LoginResult loginResult) {
+        if (callbacks.isEmpty())
+            throw new RuntimeException("Please use registerCallback(FacebookCallback callback), before using this class");
+
         for (FacebookCallback callback : callbacks) {
             callback.onSuccess(loginResult);
         }
@@ -97,6 +101,9 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
 
     @Override
     public void onCancel() {
+        if (callbacks.isEmpty())
+            throw new RuntimeException("Please use registerCallback(FacebookCallback callback), before using this class");
+
         for (FacebookCallback callback : callbacks) {
             callback.onCancel();
         }
@@ -104,6 +111,9 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
 
     @Override
     public void onError(FacebookException e) {
+        if (callbacks.isEmpty())
+            throw new RuntimeException("Please use registerCallback(FacebookCallback callback), before using this class");
+
         for (FacebookCallback callback : callbacks) {
             callback.onError(e);
         }
@@ -113,10 +123,12 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
     /* private methods */
 
     private void setupFacebook() {
+        FacebookSdk.sdkInitialize(applicationContext);
+
         setupTokenTracker();
         setupProfileTracker();
-        facebookTokenTracker.startTracking();
-        facebookProfileTracker.startTracking();
+    //    facebookTokenTracker.startTracking();
+    //    facebookProfileTracker.startTracking();
 
         callbackManager = CallbackManager.Factory.create();
         loginManager = LoginManager.getInstance();
@@ -130,18 +142,32 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
         facebookTokenTracker = new AccessTokenTracker() {
             @Override
             protected void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken currentAccessToken) {
+                if (callbacks.isEmpty())
+                    throw new RuntimeException("Please use registerCallback(FacebookCallback callback), before using this class");
+
+                for (FacebookCallback callback : callbacks) {
+                    callback.onCurrentAccessTokenChanged(oldAccessToken, currentAccessToken);
+                }
                 Log.d("TokenTracker", "" + currentAccessToken);
             }
         };
+        facebookTokenTracker.startTracking();
     }
 
     private void setupProfileTracker() {
         facebookProfileTracker = new ProfileTracker() {
             @Override
             protected void onCurrentProfileChanged(Profile oldProfile, Profile currentProfile) {
+                if (callbacks.isEmpty())
+                    throw new RuntimeException("Please use registerCallback(FacebookCallback callback), before using this class");
+
+                for (FacebookCallback callback : callbacks) {
+                    callback.onCurrentProfileChanged(oldProfile, currentProfile);
+                }
                 Log.d("ProfileTracker", "" + currentProfile);
             }
         };
+        facebookProfileTracker.startTracking();
     }
 
 
@@ -151,6 +177,9 @@ public class FacebookLoginManager implements FacebookCallback<LoginResult> {
         void onSuccess(LoginResult loginResult);
         void onCancel();
         void onError(FacebookException e);
+        // optional, may be empty
+        void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken currentAccessToken);
+        void onCurrentProfileChanged(Profile oldProfile, Profile currentProfile);
     }
 
 }
