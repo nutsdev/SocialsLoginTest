@@ -14,9 +14,9 @@ import java.util.List;
 /**
  * Singleton for Google+ login
  */
-public class GooglePlusService implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+public class GooglePlusLoginManager implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
-    private static volatile GooglePlusService instance;
+    private static volatile GooglePlusLoginManager instance;
 
     private final List<GooglePlusCallback> callbacks;
 
@@ -25,20 +25,20 @@ public class GooglePlusService implements GoogleApiClient.ConnectionCallbacks, G
     private Context context;
 
 
-    public static GooglePlusService getInstance(Context context) {
-        GooglePlusService localInstance = instance;
+    public static GooglePlusLoginManager getInstance(Context context) {
+        GooglePlusLoginManager localInstance = instance;
         if (localInstance == null) {
-            synchronized (GooglePlusService.class) {
+            synchronized (GooglePlusLoginManager.class) {
                 localInstance = instance;
                 if (localInstance == null) {
-                    instance = localInstance = new GooglePlusService(context);
+                    instance = localInstance = new GooglePlusLoginManager(context);
                 }
             }
         }
         return localInstance;
     }
 
-    private GooglePlusService(Context context) {
+    private GooglePlusLoginManager(Context context) {
         this.context = context;
         callbacks = new ArrayList<>();
         googleApiClient = buildGoogleApiClient();
@@ -67,11 +67,11 @@ public class GooglePlusService implements GoogleApiClient.ConnectionCallbacks, G
         return googleApiClient.isConnected();
     }
 
-    public void register(GooglePlusCallback callback) {
+    public void registerCallback(GooglePlusCallback callback) {
         callbacks.add(callback);
     }
 
-    public void unregister(GooglePlusCallback callback) {
+    public void unregisterCallback(GooglePlusCallback callback) {
         callbacks.remove(callback);
     }
 

@@ -39,7 +39,7 @@ import java.util.Arrays;
 import java.util.List;
 
 
-public class MainActivity extends AppCompatActivity implements GooglePlusService.GooglePlusCallback {
+public class MainActivity extends AppCompatActivity implements GooglePlusLoginManager.GooglePlusCallback {
 
     public static final String USER_INFO = "USER_INFO";
 
@@ -81,15 +81,15 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
     // until the user clicks 'sign in'.
     private int signInError;
 
-    private GooglePlusService googlePlusService;
+    private GooglePlusLoginManager googlePlusLoginManager;
 
     private LoginManager loginManager;
     private CallbackManager callbackManager;
     private AccessTokenTracker facebookTokenTracker;
     private ProfileTracker facebookProfileTracker;
 
-    private SignInButton sign_in_button; // Google login button
-    private Button login_button; // Facebook login button
+    private SignInButton google_login_button; // Google login button
+    private Button facebook_login_button; // Facebook login button
     private Button logOut_button;
 
 
@@ -102,11 +102,11 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
 
         setContentView(R.layout.activity_main);
 
-        googlePlusService = GooglePlusService.getInstance(this);
+        googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
 
-        sign_in_button = (SignInButton) findViewById(R.id.sign_in_button);
-        sign_in_button.setOnClickListener(googleButtonListener);
-        login_button = (Button) findViewById(R.id.login_button);
+        google_login_button = (SignInButton) findViewById(R.id.google_login_button);
+        google_login_button.setOnClickListener(googleButtonListener);
+        facebook_login_button = (Button) findViewById(R.id.facebook_login_button);
         setupFacebook();
         logOut_button = (Button) findViewById(R.id.logOut_button);
         logOut_button.setOnClickListener(logOutButtonListener);
@@ -121,9 +121,9 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
         callbackManager = CallbackManager.Factory.create();
         loginManager = LoginManager.getInstance();
         loginManager.registerCallback(callbackManager, loginResultFacebookCallback);
-        login_button.setOnClickListener(facebookLoginButtonListener);
-    //    login_button.setReadPermissions("public_profile", "email");
-    //    login_button.registerCallback(callbackManager, loginResultFacebookCallback);
+        facebook_login_button.setOnClickListener(facebookLoginButtonListener);
+    //    facebook_login_button.setReadPermissions("public_profile", "email");
+    //    facebook_login_button.registerCallback(callbackManager, loginResultFacebookCallback);
     }
 
     @Override
@@ -135,13 +135,13 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
     @Override
     protected void onStart() {
         super.onStart();
-        googlePlusService.register(this);
+        googlePlusLoginManager.registerCallback(this);
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        googlePlusService.unregister(this);
+        googlePlusLoginManager.unregisterCallback(this);
     }
 
     @Override
@@ -165,10 +165,10 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
                 googleSignInProgress = STATE_DEFAULT;
             }
 
-            if (!googlePlusService.isConnecting()) {
+            if (!googlePlusLoginManager.isConnecting()) {
                 // If Google Play services resolved the issue with a dialog then
                 // onStart is not called so we need to re-attempt connection here.
-                googlePlusService.connect();
+                googlePlusLoginManager.connect();
             }
         } else {
             callbackManager.onActivityResult(requestCode, resultCode, data);
@@ -202,7 +202,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
                 // The intent was canceled before it was sent.  Attempt to connect to
                 // get an updated ConnectionResult.
                 googleSignInProgress = STATE_SIGN_IN;
-                googlePlusService.connect();
+                googlePlusLoginManager.connect();
             }
         } else {
             // Google Play services wasn't able to provide an intent for some
@@ -239,8 +239,8 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
 
     private void changeButtonsState(int loggedWith) {
         if (loggedWith == NOT_SIGNED_IN) {
-            sign_in_button.setEnabled(true);
-            login_button.setEnabled(true);
+            google_login_button.setEnabled(true);
+            facebook_login_button.setEnabled(true);
             logOut_button.setEnabled(false);
             signedWith = NOT_SIGNED_IN;
             return;
@@ -250,8 +250,8 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
             signedWith = SIGNED_WITH_FACEBOOK;
         }
 
-        sign_in_button.setEnabled(false);
-        login_button.setEnabled(false);
+        google_login_button.setEnabled(false);
+        facebook_login_button.setEnabled(false);
         logOut_button.setEnabled(true);
     }
 
@@ -279,13 +279,13 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
     private View.OnClickListener googleButtonListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            if (googlePlusService.isConnected()) {
-                GoogleApiClient googleApiClient = googlePlusService.getGoogleApiClient();
+            if (googlePlusLoginManager.isConnected()) {
+                GoogleApiClient googleApiClient = googlePlusLoginManager.getGoogleApiClient();
                 Plus.AccountApi.clearDefaultAccount(googleApiClient);
                 googleApiClient.disconnect();
             }
             googleSignInProgress = STATE_SIGN_IN;
-            googlePlusService.connect();
+            googlePlusLoginManager.connect();
         }
     };
 
@@ -307,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
 
         UserInfo userInfo = new UserInfo();
         // Retrieve some profile information to personalize our app for the user.
-        GoogleApiClient googleApiClient = googlePlusService.getGoogleApiClient();
+        GoogleApiClient googleApiClient = googlePlusLoginManager.getGoogleApiClient();
         Person currentUser = Plus.PeopleApi.getCurrentPerson(googleApiClient);
         userInfo.userEmail = Plus.AccountApi.getAccountName(googleApiClient);
         userInfo.userName = currentUser.getDisplayName();
@@ -410,9 +410,9 @@ public class MainActivity extends AppCompatActivity implements GooglePlusService
             switch (signedWith) {
                 case SIGNED_WITH_GOOGLE:
                     // We clear the default account on sign out so that Google Play services will not return an onConnected callback without user interaction.
-                    if (googlePlusService.isConnected()) {
-                        Plus.AccountApi.clearDefaultAccount(googlePlusService.getGoogleApiClient());
-                        googlePlusService.disconnect();
+                    if (googlePlusLoginManager.isConnected()) {
+                        Plus.AccountApi.clearDefaultAccount(googlePlusLoginManager.getGoogleApiClient());
+                        googlePlusLoginManager.disconnect();
                     }
                     break;
                 case SIGNED_WITH_FACEBOOK:
