@@ -11,8 +11,17 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        release {
+            storeFile file("${rootProject.projectDir}/keystore.jks")
+            storePassword "123456"
+            keyAlias "alias"
+            keyPassword "123456"
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -28,6 +37,7 @@ dependencies {
     compile 'com.android.support:appcompat-v7:22.2.0'
     compile 'com.facebook.android:facebook-android-sdk:4.1.0'
     compile 'com.google.android.gms:play-services:7.5.0'
+    compile 'com.vk:androidsdk:+'
     compile 'com.squareup.picasso:picasso:2.5.2'
 //    compile 'com.google.android.gms:play-services-plus:7.5.0'
 }
