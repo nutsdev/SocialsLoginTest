@@ -25,6 +25,7 @@ import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.plus.Plus;
 import com.google.android.gms.plus.model.people.Person;
+import com.vk.sdk.VKUIHelper;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -88,8 +89,10 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        VKUIHelper.onCreate(this); // todo
         facebookLoginManager = FacebookLoginManager.getInstance(getApplicationContext());
         googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
+    //    VKSdk.initialize(VKSdkListener listener, String appId, VKAccessToken token);
 
         setContentView(R.layout.activity_main);
 
@@ -105,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     protected void onResume() {
         super.onResume();
         logout_button.setEnabled(signedWith > 0);
+        VKUIHelper.onResume(this); // todo
     }
 
     @Override
@@ -124,7 +128,8 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onDestroy() {
         super.onDestroy();
-    //    facebookTokenTracker.stopTracking();
+        VKUIHelper.onDestroy(this); // todo
+        //    facebookTokenTracker.stopTracking();
     //    facebookProfileTracker.stopTracking();
     }
 
@@ -149,6 +154,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
             }
         } else {
             facebookLoginManager.onActivityResult(requestCode, resultCode, data);
+            VKUIHelper.onActivityResult(this, requestCode, resultCode, data); // todo
         }
     }
 
