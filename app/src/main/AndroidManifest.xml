@@ -18,6 +18,9 @@
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
             android:value="@string/facebook_app_id"/>
+        <meta-data
+            android:name="com.vk.sdk.AppId"
+            android:value="5002905" />
 
         <activity
             android:name=".MainActivity"
@@ -35,6 +38,10 @@
             android:label="@string/app_name" />
         <activity
             android:name="com.vk.sdk.VKOpenAuthActivity" />
+        <activity
+            android:name="com.vk.sdk.VKServiceActivity"
+            android:label="ServiceActivity"
+            android:theme="@style/VK.Transparent" />
         <activity
             android:name=".WelcomeActivity"
             android:label="@string/title_activity_welcome" >

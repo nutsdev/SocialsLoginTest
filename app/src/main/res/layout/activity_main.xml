@@ -23,6 +23,14 @@
         android:layout_height="wrap_content" />
 
     <Button
+        android:layout_marginTop="4dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@android:color/holo_blue_bright"
+        android:text="Sign in with VK"
+        android:id="@+id/vk_login_button" />
+
+    <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Log Out"
