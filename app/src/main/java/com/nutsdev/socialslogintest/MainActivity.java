@@ -3,6 +3,7 @@ package com.nutsdev.socialslogintest;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
@@ -26,7 +27,6 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.plus.Plus;
 import com.google.android.gms.plus.model.people.Person;
 import com.vk.sdk.VKAccessToken;
-import com.vk.sdk.VKCallback;
 import com.vk.sdk.VKSdk;
 import com.vk.sdk.api.VKApi;
 import com.vk.sdk.api.VKApiConst;
@@ -44,13 +44,14 @@ import java.util.Arrays;
 import java.util.List;
 
 
-public class MainActivity extends AppCompatActivity implements GooglePlusLoginManager.GooglePlusCallback, FacebookLoginManager.FacebookCallback {
+public class MainActivity extends AppCompatActivity implements GooglePlusLoginManager.GooglePlusCallback, FacebookLoginManager.FacebookCallback, VkLoginManager.VkCallback {
 
     public static final String USER_INFO = "USER_INFO";
 
     private static final int NOT_SIGNED_IN = -1;
     private static final int SIGNED_WITH_GOOGLE = 1;
     private static final int SIGNED_WITH_FACEBOOK = 2;
+    private static final int SIGNED_WITH_VK = 3;
     // Google+ states
     private static final int STATE_DEFAULT = 10;
     private static final int STATE_SIGN_IN = 11;
@@ -88,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
 
     private GooglePlusLoginManager googlePlusLoginManager;
     private FacebookLoginManager facebookLoginManager;
+    private VkLoginManager vkLoginManager;
 
     private SignInButton google_login_button; // Google login button
     private Button facebook_login_button; // Facebook login button
@@ -100,10 +102,11 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        VKSdk.initialize(getApplicationContext());
-        facebookLoginManager = FacebookLoginManager.getInstance(getApplicationContext());
+
+        Context applicationContext = getApplicationContext();
+        facebookLoginManager = FacebookLoginManager.getInstance(applicationContext);
         googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
-    //    VKSdk.initialize(VKSdkListener listener, String appId, VKAccessToken token);
+        vkLoginManager = VkLoginManager.getInstance(applicationContext);
 
         setContentView(R.layout.activity_main);
 
@@ -128,6 +131,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         super.onStart();
         googlePlusLoginManager.registerCallback(this);
         facebookLoginManager.registerCallback(this);
+        vkLoginManager.registerCallback(this);
     }
 
     @Override
@@ -135,6 +139,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         super.onStop();
         googlePlusLoginManager.unregisterCallback(this);
         facebookLoginManager.unregisterCallback(this);
+        vkLoginManager.unregisterCallback(this);
     }
 
     @Override
@@ -147,7 +152,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     //    super.onActivityResult(requestCode, resultCode, data);
-        if (!VKSdk.onActivityResult(requestCode, resultCode, data, accessTokenVKCallback)) {
+        if (!VKSdk.onActivityResult(requestCode, resultCode, data, vkLoginManager)) {
             if (requestCode == REQUEST_CODE_SIGN_IN) {
                 if (resultCode == RESULT_OK) {
                     // If the error resolution was successful we should continue
@@ -236,6 +241,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         if (loggedWith == NOT_SIGNED_IN) {
             google_login_button.setEnabled(true);
             facebook_login_button.setEnabled(true);
+            vk_login_button.setEnabled(true);
             logout_button.setEnabled(false);
             signedWith = NOT_SIGNED_IN;
             return;
@@ -243,10 +249,13 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
             signedWith = SIGNED_WITH_GOOGLE;
         } else if (loggedWith == SIGNED_WITH_FACEBOOK) {
             signedWith = SIGNED_WITH_FACEBOOK;
+        } else if (loggedWith == SIGNED_WITH_VK) {
+            signedWith = SIGNED_WITH_VK;
         }
 
         google_login_button.setEnabled(false);
         facebook_login_button.setEnabled(false);
+        vk_login_button.setEnabled(false);
         logout_button.setEnabled(true);
     }
 
@@ -283,16 +292,40 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     private View.OnClickListener vkLoginButtonListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            String[] scopes = new String[]{ VKScopes.EMAIL
-            /*        VKScope.FRIENDS,
-                    VKScope.WALL,
-                    VKScope.PHOTOS,
-                    VKScope.NOHTTPS */
-            };
-            VKSdk.login(MainActivity.this, scopes);
+            String[] scopes = new String[]{ VKScopes.EMAIL };
+            vkLoginManager.login(MainActivity.this, scopes);
         }
     };
 
+    private View.OnClickListener logOutButtonListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (signedWith < 0)
+                return;
+
+            switch (signedWith) {
+                case SIGNED_WITH_GOOGLE:
+                    // We clear the default account on sign out so that Google Play services will not return an onConnected callback without user interaction.
+                    if (googlePlusLoginManager.isConnected()) {
+                        Plus.AccountApi.clearDefaultAccount(googlePlusLoginManager.getGoogleApiClient());
+                        googlePlusLoginManager.disconnect();
+                    }
+                    break;
+                case SIGNED_WITH_FACEBOOK:
+                    facebookLoginManager.logOut();
+                    break;
+                case SIGNED_WITH_VK:
+                    vkLoginManager.logOut();
+                    break;
+            }
+            changeButtonsState(NOT_SIGNED_IN);
+        }
+    };
+
+
+    /* login managers callbacks */
+
+    /*  Google+ */
     /* onConnected is called when our Activity successfully connects to Google Play services.  onConnected indicates that an account was selected on the
      * device, that the selected account has granted any requested permissions to our app and that we were able to establish a service connection to Google Play services. */
     @Override
@@ -338,6 +371,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         }
     }
 
+    /* Facebook */
     @Override
     public void onSuccess(LoginResult loginResult) {
         changeButtonsState(SIGNED_WITH_FACEBOOK);
@@ -401,79 +435,56 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         L.toast(this, "old profile: " + oldProfile + "; new profile: " + currentProfile);
     }
 
-    private VKCallback<VKAccessToken> accessTokenVKCallback = new VKCallback<VKAccessToken>() {
-        @Override
-        public void onResult(final VKAccessToken res) {
-            // User passed Authorization
-            //startTestActivity();
-            VKParameters parameters = VKParameters.from(VKApiConst.FIELDS,
-                    "id,first_name,last_name,sex,bdate,city,country,photo_50,photo_100," +
-                            "photo_200_orig,photo_200,photo_400_orig,photo_max,photo_max_orig,online," +
-                            "online_mobile,lists,domain,has_mobile,contacts,connections,site,education," +
-                            "universities,schools,can_post,can_see_all_posts,can_see_audio,can_write_private_message," +
-                            "status,last_seen,common_count,relation,relatives,counters");
-            VKRequest request = VKApi.users().get(parameters);
-            request.useSystemLanguage = true;
-            request.setPreferredLang("ru");
-            request.executeWithListener(new VKRequest.VKRequestListener() {
-                @Override
-                public void onComplete(VKResponse response) {
-                    UserInfo userInfo = new UserInfo();
-                    JSONObject json = response.json;
-                    JSONArray jsonArray = json.optJSONArray("response");
-                    JSONObject jsonObject = jsonArray.optJSONObject(0);
-                    userInfo.userName = jsonObject.optString("first_name") + " " + jsonObject.optString("last_name");
-                    userInfo.userAvatarUrl = jsonObject.optString("photo_200");
-                    userInfo.userProfileUrl = "http://vk.com/" + jsonObject.optString("domain");
-                    userInfo.userEmail = res.email;
-                    userInfo.userId = res.userId;
-                    startWelcomeActivity(userInfo);
-                }
+    /*  VK  */
+    @Override
+    public void onResult(final VKAccessToken vkAccessToken) {
+        // User passed Authorization
+        changeButtonsState(SIGNED_WITH_VK);
 
-                @Override
-                public void attemptFailed(VKRequest request, int attemptNumber, int totalAttempts) {
-                    super.attemptFailed(request, attemptNumber, totalAttempts);
-                }
-
-                @Override
-                public void onError(VKError error) {
-                    L.t(MainActivity.this, "Error: " + error.errorMessage);
-                }
-
-                @Override
-                public void onProgress(VKRequest.VKProgressType progressType, long bytesLoaded, long bytesTotal) {
-                    super.onProgress(progressType, bytesLoaded, bytesTotal);
-                }
-            });
-        }
-
-        @Override
-        public void onError(VKError error) {
-            // User didn't pass Authorization
-            L.t(MainActivity.this, "Error: " + error.errorMessage);
-        }
-    };
-
-    private View.OnClickListener logOutButtonListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            if (signedWith < 0)
-                return;
-
-            switch (signedWith) {
-                case SIGNED_WITH_GOOGLE:
-                    // We clear the default account on sign out so that Google Play services will not return an onConnected callback without user interaction.
-                    if (googlePlusLoginManager.isConnected()) {
-                        Plus.AccountApi.clearDefaultAccount(googlePlusLoginManager.getGoogleApiClient());
-                        googlePlusLoginManager.disconnect();
-                    }
-                    break;
-                case SIGNED_WITH_FACEBOOK:
-                    facebookLoginManager.logOut();
-                    break;
+        VKParameters parameters = VKParameters.from(VKApiConst.FIELDS,
+                "id,first_name,last_name,sex,bdate,city,country,photo_50,photo_100," +
+                        "photo_200_orig,photo_200,photo_400_orig,photo_max,photo_max_orig,online," +
+                        "online_mobile,lists,domain,has_mobile,contacts,connections,site,education," +
+                        "universities,schools,can_post,can_see_all_posts,can_see_audio,can_write_private_message," +
+                        "status,last_seen,common_count,relation,relatives,counters");
+        VKRequest request = VKApi.users().get(parameters);
+        request.useSystemLanguage = true;
+        request.setPreferredLang("ru");
+        request.executeWithListener(new VKRequest.VKRequestListener() {
+            @Override
+            public void onComplete(VKResponse response) {
+                UserInfo userInfo = new UserInfo();
+                JSONObject json = response.json;
+                JSONArray jsonArray = json.optJSONArray("response");
+                JSONObject jsonObject = jsonArray.optJSONObject(0);
+                userInfo.userName = jsonObject.optString("first_name") + " " + jsonObject.optString("last_name");
+                userInfo.userAvatarUrl = jsonObject.optString("photo_200");
+                userInfo.userProfileUrl = "http://vk.com/" + jsonObject.optString("domain");
+                userInfo.userEmail = vkAccessToken.email;
+                userInfo.userId = vkAccessToken.userId;
+                startWelcomeActivity(userInfo);
             }
-            changeButtonsState(NOT_SIGNED_IN);
-        }
-    };
+
+            @Override
+            public void attemptFailed(VKRequest request, int attemptNumber, int totalAttempts) {
+                super.attemptFailed(request, attemptNumber, totalAttempts);
+            }
+
+            @Override
+            public void onError(VKError error) {
+                L.t(MainActivity.this, "Error: " + error.errorMessage);
+            }
+
+            @Override
+            public void onProgress(VKRequest.VKProgressType progressType, long bytesLoaded, long bytesTotal) {
+                super.onProgress(progressType, bytesLoaded, bytesTotal);
+            }
+        });
+    }
+
+    @Override
+    public void onError(VKError vkError) {
+        L.toast(this, "Error: " + vkError.errorMessage);
+    }
 
 }
