@@ -3,10 +3,13 @@ package com.nutsdev.socialslogintest;
 import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
+import android.support.annotation.Nullable;
+import android.util.Log;
 
 import com.vk.sdk.VKAccessToken;
 import com.vk.sdk.VKCallback;
 import com.vk.sdk.VKSdk;
+import com.vk.sdk.VkAccessTokenTracker;
 import com.vk.sdk.api.VKError;
 
 import java.util.ArrayList;
@@ -20,6 +23,8 @@ public class VkLoginManager implements VKCallback<VKAccessToken> {
     private static volatile VkLoginManager instance;
 
     private final List<VkCallback> callbacks;
+
+    private VkAccessTokenTracker vkAccessTokenTracker;
 
     private Context applicationContext;
 
@@ -52,6 +57,14 @@ public class VkLoginManager implements VKCallback<VKAccessToken> {
 
     public void unregisterCallback(VkCallback callback) {
         callbacks.remove(callback);
+    }
+
+    public void startTrackingToken() {
+        vkAccessTokenTracker.startTracking();
+    }
+
+    public void stopTrackingToken() {
+        vkAccessTokenTracker.stopTracking();
     }
 
     public void login(Activity activity, String... scopes) {
@@ -94,6 +107,22 @@ public class VkLoginManager implements VKCallback<VKAccessToken> {
 
     private void setupVk() {
         VKSdk.initialize(applicationContext);
+        setupTokenTracker();
+    }
+
+    private void setupTokenTracker() {
+        vkAccessTokenTracker = new VkAccessTokenTracker() {
+            @Override
+            public void onVKAccessTokenChanged(@Nullable VKAccessToken oldToken, @Nullable VKAccessToken newToken) {
+                if (callbacks.isEmpty())
+                    throw new RuntimeException("Please use registerCallback(VkCallback callback), before using this class");
+
+                for (VkCallback callback : callbacks) {
+                    callback.onVKAccessTokenChanged(oldToken, newToken);
+                }
+                Log.d("TokenTracker", "" + newToken);
+            }
+        };
     }
 
 
@@ -102,6 +131,8 @@ public class VkLoginManager implements VKCallback<VKAccessToken> {
     public interface VkCallback {
         void onResult(VKAccessToken vkAccessToken);
         void onError(VKError vkError);
+
+        void onVKAccessTokenChanged(VKAccessToken oldToken, VKAccessToken newToken);
     }
 
 }

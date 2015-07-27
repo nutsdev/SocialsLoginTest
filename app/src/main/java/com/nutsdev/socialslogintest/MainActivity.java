@@ -107,6 +107,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
         facebookLoginManager = FacebookLoginManager.getInstance(applicationContext);
         googlePlusLoginManager = GooglePlusLoginManager.getInstance(this);
         vkLoginManager = VkLoginManager.getInstance(applicationContext);
+        vkLoginManager.startTrackingToken();
 
         setContentView(R.layout.activity_main);
 
@@ -145,6 +146,7 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        vkLoginManager.stopTrackingToken();
         //    facebookTokenTracker.stopTracking();
     //    facebookProfileTracker.stopTracking();
     }
@@ -485,6 +487,16 @@ public class MainActivity extends AppCompatActivity implements GooglePlusLoginMa
     @Override
     public void onError(VKError vkError) {
         L.toast(this, "Error: " + vkError.errorMessage);
+    }
+
+    @Override
+    public void onVKAccessTokenChanged(VKAccessToken oldToken, VKAccessToken newToken) {
+        if (newToken == null) {
+            L.toast(this, "AccessToken invalidated");
+            Intent intent = new Intent(MainActivity.this, MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+        }
     }
 
 }
